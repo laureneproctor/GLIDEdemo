@@ -1,0 +1,95 @@
+/*
+  Note: The acoustic sensor's yellow wire connects to pin 8, white wire connects to pin 7
+        The SD Logger's Rx connects to Tx(1), and its Tx to Rx(0)
+*/
+#include <SoftwareSerial.h>
+#include <SD.h>
+
+uint8_t buffer_RTT[4] = {0};
+uint8_t CS;
+
+#define COM 0x55
+#define SPIN 6 // S pin
+SoftwareSerial mySerial(7, 8);
+uint16_t i = 0;
+File file;
+
+void setup() {
+  /* Set up for Serial Logger */
+  Serial.begin(9600);
+  mySerial.begin(115200);
+  delay(2000); // prevent data loss reasons
+  pinMode(SPIN, OUTPUT);
+  digitalWrite(SPIN, HIGH);
+
+  if (!SD.begin()) { 
+    Serial.println("SD Logger Error.");
+    return;
+  }
+}
+
+void loop() {
+  mySerial.write(COM);
+  delay(100);
+  
+  int Distance;
+  if(mySerial.available() > 0){
+    
+    delay(4);
+    
+    if(mySerial.read() == 0xff){    
+      buffer_RTT[0] = 0xff;
+      
+      for (int k=1; k<4; k++){
+        buffer_RTT[k] = mySerial.read();   
+      }
+
+      CS = buffer_RTT[0] + buffer_RTT[1] + buffer_RTT[2];  
+      if(buffer_RTT[3] == CS) {
+        Distance = (buffer_RTT[1] << 8) + buffer_RTT[2];
+        
+        // print data to serial moniter
+        Serial.print("Distance:");
+        Serial.print(Distance);
+        Serial.println("mm");
+
+        // Write to file
+        //writeToFile(Distance);
+        
+        if(Distance < 600) { // NOTE: 600mm is arbitrary; roughly 2 ft
+          Serial.println("Obstacle Ahead. Changing Direction...");
+          /* Activate Rutter controls to change direction */
+        }
+      }
+    }
+  }
+  
+  // Print data to Serial monitor
+  // Serial.println(String(Distance));
+  // i++;
+
+  // Save data to SD card every 10 iterations
+  if ((i % 10) == 0) {
+    digitalWrite(SPIN, LOW);
+    delay(500);
+    digitalWrite(SPIN, HIGH);
+  }
+
+  delay(300);
+
+}
+
+// void writeToFile(int data) 
+// {
+//   file = SD.open("DistanceReadings.txt", FILE_WRITE); 
+  
+//   // If file opened, write data 
+//   if (file) {
+//     file.println(data);
+//     file.close();
+//   } 
+//   else {
+//     // error
+//     Serial.println("Could not open file");
+//   }
+// }
